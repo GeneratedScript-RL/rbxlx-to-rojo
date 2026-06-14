@@ -1,5 +1,6 @@
-use rbx_dom_weak::{types::Variant, Instance};
+use rbx_dom_weak::Instance;
 use serde::{Deserialize, Serialize, Serializer};
+use serde_json::Value;
 use std::{
     borrow::Cow,
     collections::BTreeMap,
@@ -68,7 +69,9 @@ pub struct ServiceHierarchy {
 pub struct HierarchyNode {
     pub name: String,
     pub class_name: String,
-    pub properties: BTreeMap<String, Variant>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub properties: BTreeMap<String, Value>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<HierarchyNode>,
 }
 

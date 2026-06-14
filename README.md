@@ -40,7 +40,10 @@ The generated project contains:
 Hierarchy properties retain their Roblox value type. For example, a Vector3 is
 written as a typed JSON value instead of being flattened into a display string.
 Internal Studio bookkeeping properties such as `HistoryId` and stylesheet
-references are omitted.
+references are omitted. Instance references are written as paths such as
+`Workspace.Baseplate`, null references are omitted, and properties equal to
+their Roblox class defaults are culled. Workspace and Camera nodes contain
+hierarchy only, without properties.
 
 ## License
 rbxlx-to-rojo is available under The Mozilla Public License, Version 2. Details are available in [LICENSE.md](LICENSE.md).

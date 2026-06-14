@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sanitized Roblox instance names that are invalid as Windows paths.
 - Removed object referents and internal Studio bookkeeping properties from
   hierarchy JSON exports.
+- Replaced instance reference IDs with Roblox-style object paths.
+- Culled default-valued properties, null references, UniqueIds, empty property
+  maps, and empty child lists from hierarchy JSON.
+- Removed properties from Workspace and Camera hierarchy nodes.
 
 ## [1.0.1] - 2021-04-11
 ### Fixed

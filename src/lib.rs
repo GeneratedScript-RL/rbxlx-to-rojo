@@ -4,6 +4,7 @@ use rbx_dom_weak::{
     ustr, Instance, WeakDom,
 };
 use rbx_reflection::ClassTag;
+use serde_json::Value;
 use std::{
     borrow::Cow,
     collections::{BTreeMap, HashMap, HashSet},
@@ -375,20 +376,130 @@ fn check_has_scripts(
     result
 }
 
-fn hierarchy_node(tree: &WeakDom, instance: &Instance) -> HierarchyNode {
-    let properties = instance
-        .properties
-        .iter()
-        .filter(|(name, _)| {
-            !matches!(
-                name.as_str(),
-                "HistoryId"
-                    | "StudioDefaultStyleSheet"
-                    | "StudioInsertWidgetLayerCollectorAutoLinkStyleSheet"
-            )
-        })
-        .map(|(name, value)| (name.to_string(), value.clone()))
-        .collect::<BTreeMap<_, _>>();
+fn is_lua_identifier(name: &str) -> bool {
+    let mut characters = name.chars();
+    let Some(first) = characters.next() else {
+        return false;
+    };
+
+    if !(first == '_' || first.is_ascii_alphabetic())
+        || !characters.all(|character| character == '_' || character.is_ascii_alphanumeric())
+    {
+        return false;
+    }
+
+    !matches!(
+        name,
+        "and"
+            | "break"
+            | "continue"
+            | "do"
+            | "else"
+            | "elseif"
+            | "end"
+            | "export"
+            | "false"
+            | "for"
+            | "function"
+            | "if"
+            | "in"
+            | "local"
+            | "nil"
+            | "not"
+            | "or"
+            | "repeat"
+            | "return"
+            | "then"
+            | "true"
+            | "type"
+            | "until"
+            | "while"
+    )
+}
+
+fn append_instance_path(parent: &str, name: &str) -> String {
+    if is_lua_identifier(name) {
+        format!("{}.{}", parent, name)
+    } else {
+        let escaped = name.replace('\\', "\\\\").replace('"', "\\\"");
+        format!("{}[\"{}\"]", parent, escaped)
+    }
+}
+
+fn collect_instance_paths(
+    tree: &WeakDom,
+    instance: &Instance,
+    path: String,
+    paths: &mut HashMap<Ref, String>,
+) {
+    paths.insert(instance.referent(), path.clone());
+
+    for child_ref in instance.children() {
+        let child = tree
+            .get_by_ref(*child_ref)
+            .expect("path child referent should exist");
+        collect_instance_paths(tree, child, append_instance_path(&path, &child.name), paths);
+    }
+}
+
+fn build_instance_paths(tree: &WeakDom) -> HashMap<Ref, String> {
+    let mut paths = HashMap::new();
+
+    for child_ref in tree.root().children() {
+        let child = tree
+            .get_by_ref(*child_ref)
+            .expect("top-level path referent should exist");
+        let path = if is_lua_identifier(&child.name) {
+            child.name.clone()
+        } else {
+            append_instance_path("game", &child.name)
+        };
+        collect_instance_paths(tree, child, path, &mut paths);
+    }
+
+    paths
+}
+
+fn hierarchy_property(value: &Variant, instance_paths: &HashMap<Ref, String>) -> Option<Value> {
+    match value {
+        Variant::Ref(referent) => instance_paths.get(referent).cloned().map(Value::String),
+        Variant::UniqueId(_) => None,
+        value => serde_json::to_value(value).ok(),
+    }
+}
+
+fn hierarchy_node(
+    tree: &WeakDom,
+    instance: &Instance,
+    instance_paths: &HashMap<Ref, String>,
+) -> HierarchyNode {
+    let reflection = rbx_reflection_database::get_bundled();
+    let class_descriptor = reflection.classes.get(instance.class.as_str());
+
+    let properties = if matches!(instance.class.as_str(), "Workspace" | "Camera") {
+        BTreeMap::new()
+    } else {
+        instance
+            .properties
+            .iter()
+            .filter(|(name, value)| {
+                !matches!(
+                    name.as_str(),
+                    "HistoryId"
+                        | "UniqueId"
+                        | "StudioDefaultStyleSheet"
+                        | "StudioInsertWidgetLayerCollectorAutoLinkStyleSheet"
+                ) && !matches!(value, Variant::UniqueId(_))
+                    && class_descriptor
+                        .and_then(|class| reflection.find_default_property(class, name.as_str()))
+                        != Some(value)
+            })
+            .filter_map(|(name, value)| {
+                hierarchy_property(value, instance_paths)
+                    .map(|property| (name.to_string(), property))
+            })
+            .collect::<BTreeMap<_, _>>()
+    };
 
     let children = instance
         .children()
@@ -398,6 +509,7 @@ fn hierarchy_node(tree: &WeakDom, instance: &Instance) -> HierarchyNode {
                 tree,
                 tree.get_by_ref(*referent)
                     .expect("hierarchy child referent should exist"),
+                instance_paths,
             )
         })
         .collect();
@@ -411,16 +523,17 @@ fn hierarchy_node(tree: &WeakDom, instance: &Instance) -> HierarchyNode {
 }
 
 pub fn build_service_hierarchy(tree: &WeakDom, service_name: &str) -> ServiceHierarchy {
+    let instance_paths = build_instance_paths(tree);
     let root = tree
         .root()
         .children()
         .iter()
         .filter_map(|referent| tree.get_by_ref(*referent))
         .find(|instance| instance.class.as_str() == service_name)
-        .map(|instance| hierarchy_node(tree, instance));
+        .map(|instance| hierarchy_node(tree, instance, &instance_paths));
 
     ServiceHierarchy {
-        schema_version: 2,
+        schema_version: 3,
         service: service_name.to_owned(),
         root,
     }

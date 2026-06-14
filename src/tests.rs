@@ -5,10 +5,11 @@ use crate::{
 use log::info;
 use pretty_assertions::assert_eq;
 use rbx_dom_weak::{
-    types::{Variant, Vector3},
+    types::{Ref, UniqueId, Variant, Vector3},
     InstanceBuilder, WeakDom,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::{
     collections::{BTreeMap, HashMap},
     fs,
@@ -127,6 +128,8 @@ impl InstructionReader for VirtualFileSystem {
 }
 
 fn hierarchy_test_place() -> WeakDom {
+    let target_ref = Ref::new();
+
     WeakDom::new(
         InstanceBuilder::new("DataModel")
             .with_child(
@@ -134,16 +137,34 @@ fn hierarchy_test_place() -> WeakDom {
                     .with_property("Gravity", 196.2_f32)
                     .with_child(
                         InstanceBuilder::new("Part")
+                            .with_referent(target_ref)
                             .with_name("Baseplate")
-                            .with_property("Anchored", true)
+                            .with_property("Anchored", false)
+                            .with_property("Transparency", 0.5_f32)
                             .with_property("Size", Vector3::new(64.0, 1.0, 64.0)),
+                    )
+                    .with_child(
+                        InstanceBuilder::new("ObjectValue")
+                            .with_name("SelectedPart")
+                            .with_property("Value", target_ref),
+                    )
+                    .with_child(
+                        InstanceBuilder::new("ObjectValue")
+                            .with_name("NoSelection")
+                            .with_property("Value", Ref::none()),
+                    )
+                    .with_child(
+                        InstanceBuilder::new("Camera")
+                            .with_name("Camera")
+                            .with_property("FieldOfView", 90.0_f32),
                     ),
             )
             .with_child(
                 InstanceBuilder::new("StarterGui").with_child(
                     InstanceBuilder::new("ScreenGui")
                         .with_name("MainGui")
-                        .with_property("Enabled", true),
+                        .with_property("Enabled", true)
+                        .with_property("UniqueId", UniqueId::new(1, 2, 3)),
                 ),
             ),
     )
@@ -169,48 +190,59 @@ fn exports_workspace_and_starter_gui_hierarchies() {
 
     let workspace = vfs.hierarchies.get("Workspace").unwrap();
     let workspace_root = workspace.root.as_ref().unwrap();
-    assert_eq!(workspace.schema_version, 2);
+    assert_eq!(workspace.schema_version, 3);
     assert_eq!(workspace_root.class_name, "Workspace");
-    assert_eq!(
-        workspace_root.properties.get("Gravity"),
-        Some(&Variant::Float32(196.2))
-    );
+    assert!(workspace_root.properties.is_empty());
+
     assert_eq!(workspace_root.children[0].name, "Baseplate");
+    assert!(!workspace_root.children[0]
+        .properties
+        .contains_key("Anchored"));
     assert_eq!(
-        workspace_root.children[0].properties.get("Anchored"),
-        Some(&Variant::Bool(true))
+        workspace_root.children[0].properties.get("Transparency"),
+        Some(&json!({"Float32": 0.5}))
     );
+    assert_eq!(
+        workspace_root.children[1].properties.get("Value"),
+        Some(&json!("Workspace.Baseplate"))
+    );
+    assert!(workspace_root.children[2].properties.is_empty());
+    assert!(workspace_root.children[3].properties.is_empty());
 
     let starter_gui = vfs.hierarchies.get("StarterGui").unwrap();
     let starter_gui_root = starter_gui.root.as_ref().unwrap();
     assert_eq!(starter_gui_root.children[0].name, "MainGui");
-    assert_eq!(
-        starter_gui_root.children[0].properties.get("Enabled"),
-        Some(&Variant::Bool(true))
-    );
+    assert!(!starter_gui_root.children[0]
+        .properties
+        .contains_key("UniqueId"));
 }
 
 #[test]
 fn omits_internal_studio_properties_and_referents() {
     let tree = WeakDom::new(
         InstanceBuilder::new("DataModel").with_child(
-            InstanceBuilder::new("Workspace")
-                .with_property("HistoryId", true)
-                .with_property("StudioDefaultStyleSheet", true)
-                .with_property("StudioInsertWidgetLayerCollectorAutoLinkStyleSheet", true)
-                .with_property("Gravity", 196.2_f32),
+            InstanceBuilder::new("Workspace").with_child(
+                InstanceBuilder::new("Part")
+                    .with_name("FilteredPart")
+                    .with_property("HistoryId", true)
+                    .with_property("StudioDefaultStyleSheet", true)
+                    .with_property("StudioInsertWidgetLayerCollectorAutoLinkStyleSheet", true)
+                    .with_property("UniqueId", UniqueId::new(1, 2, 3))
+                    .with_property("CustomData", true),
+            ),
         ),
     );
 
     let hierarchy = build_service_hierarchy(&tree, "Workspace");
-    let root = hierarchy.root.as_ref().unwrap();
+    let part = &hierarchy.root.as_ref().unwrap().children[0];
 
-    assert!(!root.properties.contains_key("HistoryId"));
-    assert!(!root.properties.contains_key("StudioDefaultStyleSheet"));
-    assert!(!root
+    assert!(!part.properties.contains_key("HistoryId"));
+    assert!(!part.properties.contains_key("StudioDefaultStyleSheet"));
+    assert!(!part
         .properties
         .contains_key("StudioInsertWidgetLayerCollectorAutoLinkStyleSheet"));
-    assert!(root.properties.contains_key("Gravity"));
+    assert!(!part.properties.contains_key("UniqueId"));
+    assert!(part.properties.contains_key("CustomData"));
 
     let json = serde_json::to_string(&hierarchy).unwrap();
     assert!(!json.contains("\"referent\""));
@@ -230,10 +262,7 @@ fn reads_binary_places_with_hierarchy_properties() {
     let workspace = build_service_hierarchy(&decoded, "Workspace");
     let baseplate = &workspace.root.unwrap().children[0];
     assert_eq!(baseplate.name, "Baseplate");
-    assert_eq!(
-        baseplate.properties.get("Anchored"),
-        Some(&Variant::Bool(true))
-    );
+    assert!(!baseplate.properties.contains_key("Anchored"));
 }
 
 #[test]
