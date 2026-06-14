@@ -166,6 +166,17 @@ fn hierarchy_test_place() -> WeakDom {
                         .with_property("Enabled", true)
                         .with_property("UniqueId", UniqueId::new(1, 2, 3)),
                 ),
+            )
+            .with_child(
+                InstanceBuilder::new("ReplicatedStorage").with_child(
+                    InstanceBuilder::new("Folder")
+                        .with_name("Shared")
+                        .with_child(
+                            InstanceBuilder::new("ModuleScript")
+                                .with_name("Config")
+                                .with_property("Source", "return {}"),
+                        ),
+                ),
             ),
     )
 }
@@ -182,7 +193,7 @@ fn sanitizes_roblox_names_for_windows_paths() {
 }
 
 #[test]
-fn exports_workspace_and_starter_gui_hierarchies() {
+fn exports_requested_service_hierarchies() {
     let tree = hierarchy_test_place();
     let mut vfs = VirtualFileSystem::default();
 
@@ -215,6 +226,15 @@ fn exports_workspace_and_starter_gui_hierarchies() {
     assert!(!starter_gui_root.children[0]
         .properties
         .contains_key("UniqueId"));
+
+    let replicated_storage = vfs.hierarchies.get("ReplicatedStorage").unwrap();
+    let replicated_storage_root = replicated_storage.root.as_ref().unwrap();
+    assert_eq!(replicated_storage_root.class_name, "ReplicatedStorage");
+    assert_eq!(replicated_storage_root.children[0].name, "Shared");
+    assert_eq!(
+        replicated_storage_root.children[0].children[0].class_name,
+        "ModuleScript"
+    );
 }
 
 #[test]
@@ -325,5 +345,6 @@ fn run_tests() {
 
         assert!(filesystem_path.join("workspace.json").is_file());
         assert!(filesystem_path.join("startergui.json").is_file());
+        assert!(filesystem_path.join("replicatedstorage.json").is_file());
     }
 }

@@ -554,7 +554,7 @@ pub fn process_instructions(tree: &WeakDom, instruction_reader: &mut dyn Instruc
     }
     .visit_instructions(&root_instance, &has_scripts);
 
-    for service_name in ["Workspace", "StarterGui"] {
+    for service_name in ["Workspace", "StarterGui", "ReplicatedStorage"] {
         let hierarchy = build_service_hierarchy(tree, service_name);
         instruction_reader.write_service_hierarchy(&hierarchy);
     }

@@ -36,6 +36,8 @@ The generated project contains:
 - `default.project.json` with the Rojo project tree.
 - `workspace.json` with the complete Workspace hierarchy and decoded properties.
 - `startergui.json` with the complete StarterGui hierarchy and decoded properties.
+- `replicatedstorage.json` with the complete ReplicatedStorage hierarchy and
+  decoded properties.
 
 Hierarchy properties retain their Roblox value type. For example, a Vector3 is
 written as a typed JSON value instead of being flattened into a display string.

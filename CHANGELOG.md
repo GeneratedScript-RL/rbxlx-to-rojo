@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.0] - 2026-06-14
 ### Added
 - Added `workspace.json` and `startergui.json` hierarchy/property exports.
+- Added `replicatedstorage.json` hierarchy/property export.
 - Added tests for binary place conversion and typed hierarchy properties.
 
 ### Changed
