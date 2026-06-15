@@ -24,6 +24,17 @@ lazy_static::lazy_static! {
     static ref RESPECTED_SERVICES: HashSet<&'static str> = include_str!("./respected-services.txt").lines().collect();
 }
 
+const HIERARCHY_SERVICES: &[&str] = &[
+    "Workspace",
+    "StarterGui",
+    "ReplicatedStorage",
+    "ReplicatedFirst",
+    "Lighting",
+    "ServerStorage",
+    "StarterPlayer",
+    "SoundService",
+];
+
 struct TreeIterator<'a, I: InstructionReader + ?Sized> {
     instruction_reader: &'a mut I,
     path: &'a Path,
@@ -554,7 +565,7 @@ pub fn process_instructions(tree: &WeakDom, instruction_reader: &mut dyn Instruc
     }
     .visit_instructions(&root_instance, &has_scripts);
 
-    for service_name in ["Workspace", "StarterGui", "ReplicatedStorage"] {
+    for service_name in HIERARCHY_SERVICES {
         let hierarchy = build_service_hierarchy(tree, service_name);
         instruction_reader.write_service_hierarchy(&hierarchy);
     }

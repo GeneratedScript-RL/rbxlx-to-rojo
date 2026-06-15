@@ -177,6 +177,45 @@ fn hierarchy_test_place() -> WeakDom {
                                 .with_property("Source", "return {}"),
                         ),
                 ),
+            )
+            .with_child(
+                InstanceBuilder::new("ReplicatedFirst").with_child(
+                    InstanceBuilder::new("LocalScript")
+                        .with_name("LoadingScreen")
+                        .with_property("Source", "print('loading')"),
+                ),
+            )
+            .with_child(
+                InstanceBuilder::new("Lighting")
+                    .with_child(InstanceBuilder::new("Atmosphere").with_name("Atmosphere")),
+            )
+            .with_child(
+                InstanceBuilder::new("ServerStorage").with_child(
+                    InstanceBuilder::new("Folder")
+                        .with_name("Assets")
+                        .with_child(InstanceBuilder::new("Model").with_name("Enemy")),
+                ),
+            )
+            .with_child(
+                InstanceBuilder::new("StarterPlayer")
+                    .with_child(
+                        InstanceBuilder::new("StarterPlayerScripts").with_child(
+                            InstanceBuilder::new("LocalScript")
+                                .with_name("Client")
+                                .with_property("Source", "print('client')"),
+                        ),
+                    )
+                    .with_child(
+                        InstanceBuilder::new("StarterCharacterScripts").with_child(
+                            InstanceBuilder::new("LocalScript")
+                                .with_name("Character")
+                                .with_property("Source", "print('character')"),
+                        ),
+                    ),
+            )
+            .with_child(
+                InstanceBuilder::new("SoundService")
+                    .with_child(InstanceBuilder::new("SoundGroup").with_name("Music")),
             ),
     )
 }
@@ -190,6 +229,18 @@ fn sanitizes_roblox_names_for_windows_paths() {
     assert_eq!(sanitize_path_component("CON"), "_CON");
     assert_eq!(sanitize_path_component("trailing. "), "trailing");
     assert_eq!(sanitize_path_component(".."), "_");
+}
+
+#[test]
+fn creates_missing_project_directories() {
+    let base = std::env::temp_dir().join("rbxlx-to-rojo-directory-test");
+    let root = base.join("generated").join("project");
+    fs::remove_dir_all(&base).ok();
+
+    FileSystem::from_root(root.clone());
+
+    assert!(root.join("src").is_dir());
+    fs::remove_dir_all(base).unwrap();
 }
 
 #[test]
@@ -234,6 +285,43 @@ fn exports_requested_service_hierarchies() {
     assert_eq!(
         replicated_storage_root.children[0].children[0].class_name,
         "ModuleScript"
+    );
+
+    let replicated_first = vfs.hierarchies.get("ReplicatedFirst").unwrap();
+    assert_eq!(
+        replicated_first.root.as_ref().unwrap().children[0].name,
+        "LoadingScreen"
+    );
+
+    let lighting = vfs.hierarchies.get("Lighting").unwrap();
+    assert_eq!(
+        lighting.root.as_ref().unwrap().children[0].class_name,
+        "Atmosphere"
+    );
+
+    let server_storage = vfs.hierarchies.get("ServerStorage").unwrap();
+    assert_eq!(
+        server_storage.root.as_ref().unwrap().children[0].children[0].name,
+        "Enemy"
+    );
+
+    let starter_player = vfs.hierarchies.get("StarterPlayer").unwrap();
+    let starter_player_root = starter_player.root.as_ref().unwrap();
+    assert_eq!(starter_player_root.children[0].name, "StarterPlayerScripts");
+    assert_eq!(starter_player_root.children[0].children[0].name, "Client");
+    assert_eq!(
+        starter_player_root.children[1].name,
+        "StarterCharacterScripts"
+    );
+    assert_eq!(
+        starter_player_root.children[1].children[0].name,
+        "Character"
+    );
+
+    let sound_service = vfs.hierarchies.get("SoundService").unwrap();
+    assert_eq!(
+        sound_service.root.as_ref().unwrap().children[0].name,
+        "Music"
     );
 }
 
@@ -346,5 +434,10 @@ fn run_tests() {
         assert!(filesystem_path.join("workspace.json").is_file());
         assert!(filesystem_path.join("startergui.json").is_file());
         assert!(filesystem_path.join("replicatedstorage.json").is_file());
+        assert!(filesystem_path.join("replicatedfirst.json").is_file());
+        assert!(filesystem_path.join("lighting.json").is_file());
+        assert!(filesystem_path.join("serverstorage.json").is_file());
+        assert!(filesystem_path.join("starterplayer.json").is_file());
+        assert!(filesystem_path.join("soundservice.json").is_file());
     }
 }

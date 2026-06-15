@@ -49,7 +49,7 @@ impl FileSystem {
         let source = root.join(SRC);
         let project = Project::new();
 
-        fs::create_dir(&source).ok(); // It'll error later if it matters
+        fs::create_dir_all(&source).ok(); // It'll error later if it matters
 
         Self {
             project,

@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-06-14
+### Added
+- Added hierarchy/property exports for `ReplicatedFirst`, `Lighting`,
+  `ServerStorage`, `StarterPlayer` and its descendants, and `SoundService`.
+
+### Fixed
+- Fixed CLI conversion failing when its generated project directory did not
+  already exist.
+
 ## [1.1.0] - 2026-06-14
 ### Added
 - Added `workspace.json` and `startergui.json` hierarchy/property exports.
